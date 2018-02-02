@@ -428,16 +428,34 @@
               (jdbc/set-parameter value stmt i)))
           (rest (range)) params)))
 
+(defn- cancellable-run-query [db sql params opts]
+  ;; TODO: get or create connection?
+  (let [real-conn (jdbc/get-connection db)]
+    ;; This is normally done for us by java.jdbc as a result of our `jdbc/query` call
+    (with-open [stmt (jdbc/prepare-statement real-conn sql opts)]
+      ;; Need to run the query in another thread so that this thread can cancel it if need be
+      (let [the-real-query (future (jdbc/query real-conn (into [stmt] params) opts))]
+        (try
+          ;; This thread is interruptable because it's awaiting the other thread (the one actually running the
+          ;; query). Interrupting this thread means that the client has disconnected (or we're shutting down) and so
+          ;; we can give up on the query running in the future
+          @the-real-query
+          (catch InterruptedException e
+            (log/warn e "Client closed connection, cancelling query")
+            ;; This is what does the real work of cancelling the query. We aren't checking the result of
+            ;; `the-real-query` but this will cause an exception to be thrown, saying the query has been cancelled.
+            (.cancel stmt)))))))
+
 (defn- run-query
   "Run the query itself."
   [{sql :query, params :params, remark :remark} timezone connection]
   (let [sql              (str "-- " remark "\n" (hx/unescape-dots sql))
         statement        (into [sql] params)
-        [columns & rows] (jdbc/query connection statement {:identifiers    identity, :as-arrays? true
-                                                           :read-columns   (read-columns-with-date-handling timezone)
-                                                           :set-parameters (set-parameters-with-timezone timezone)})]
-    {:rows    (or rows [])
-     :columns columns}))
+        [columns & rows] (cancellable-run-query connection sql params {:identifiers    identity, :as-arrays? true
+                                                                       :read-columns   (read-columns-with-date-handling timezone)
+                                                                       :set-parameters (set-parameters-with-timezone timezone)})] (future)
+       {:rows    (or rows [])
+        :columns columns}))
 
 (defn- exception->nice-error-message ^String [^SQLException e]
   (or (->> (.getMessage e)     ; error message comes back like 'Column "ZID" not found; SQL statement: ... [error-code]' sometimes
