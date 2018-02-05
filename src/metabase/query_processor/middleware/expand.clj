@@ -289,8 +289,14 @@
   (and (between lat-field lat-min lat-max)
        (between lon-field lon-min lon-max)))
 
-(s/defn ^:private string-filter :- StringFilter [filter-type f s]
-  (i/map->StringFilter {:filter-type filter-type, :field (field f), :value (value f s)}))
+(s/defn ^:private string-filter :- StringFilter
+  ([filter-type f s]
+   (string-filter filter-type f s {:case-sensitive? false}))
+  ([filter-type f s options-map]
+   (i/strict-map->StringFilter (assoc options-map
+                                 :filter-type filter-type
+                                 :field       (field f)
+                                 :value       (value f s)))))
 
 (def ^:ql ^{:arglists '([f s])} starts-with "Filter subclause. Return results where F starts with the string S."    (partial string-filter :starts-with))
 (def ^:ql ^{:arglists '([f s])} contains    "Filter subclause. Return results where F contains the string S."       (partial string-filter :contains))
