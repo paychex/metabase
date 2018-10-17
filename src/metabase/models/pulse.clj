@@ -338,6 +338,22 @@
     ;; return the full Pulse (and record our create event)
     (events/publish-event! :pulse-create (retrieve-pulse pulse-id))))
 
+(s/defn copy-pulse!
+  "Copies a pulse by using values from an existing pulse.
+
+  Returns the newly created Pulse, or throws an Exception."
+  {:style/indent 2}
+  [pulse    :- PulseInstance
+   kvs      :- {:name                                 su/NonBlankString
+                :creator_id                           su/IntGreaterThanZero
+                (s/optional-key :skip_if_empty)       (s/maybe s/Bool)
+                (s/optional-key :collection_id)       (s/maybe su/IntGreaterThanZero)
+                (s/optional-key :collection_position) (s/maybe su/IntGreaterThanZero)}]
+  (create-pulse! 
+    (map card->ref (:cards pulse))
+    (:channels pulse) 
+    (merge (select-keys pulse [:name :creator_id :skip_if_empty :collection_id :collection_position]) kvs)))
+
 (defn create-alert!
   "Creates a pulse with the correct fields specified for an alert"
   [alert creator-id card-id channels]
