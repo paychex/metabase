@@ -7,9 +7,17 @@ import {
   getCollectionType,
 } from "metabase/entities/collections";
 
+import { POST } from "metabase/lib/api";
+
+const COPY_ACTION = `metabase/entities/pulses/COPY`;
+
 const Pulses = createEntity({
   name: "pulses",
   path: "/api/pulse",
+
+  api: {
+    copy: POST("/api/pulse/:id/copy"),
+  },
 
   objectActions: {
     setArchived: ({ id }, archived, opts) =>
@@ -35,6 +43,25 @@ const Pulses = createEntity({
         },
         opts,
       ),
+
+      copy: ({ id }, overrides, opts) => 
+        Pulses.actions.copy(
+          { id },
+          overrides,
+          opts,
+        ),
+  },
+
+  actions: {
+    copy: (pulse, overrides) => async dispatch => {
+      // overrides are name, description, and collection_id
+      const newPulse = await Pulses.api.copy(
+        { id: pulse.id,
+          ...overrides
+        });
+      dispatch({ type: Pulses.actionTypes.INVALIDATE_LISTS_ACTION });
+      return { type: COPY_ACTION, payload: newPulse };
+    },
   },
 
   objectSelectors: {
