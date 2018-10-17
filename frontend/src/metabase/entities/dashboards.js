@@ -1,5 +1,7 @@
 /* @flow */
 
+import { setRequestState } from "metabase/redux/requests";
+
 import { createEntity, undo } from "metabase/lib/entities";
 import * as Urls from "metabase/lib/urls";
 import { normal } from "metabase/lib/colors";
@@ -14,6 +16,7 @@ import {
 
 const FAVORITE_ACTION = `metabase/entities/dashboards/FAVORITE`;
 const UNFAVORITE_ACTION = `metabase/entities/dashboards/UNFAVORITE`;
+const COPY_ACTION = `metabase/entities/dashboards/COPY`;
 
 const Dashboards = createEntity({
   name: "dashboards",
@@ -23,6 +26,7 @@ const Dashboards = createEntity({
     favorite: POST("/api/dashboard/:id/favorite"),
     unfavorite: DELETE("/api/dashboard/:id/favorite"),
     save: POST("/api/dashboard/save"),
+    copy: POST("/api/dashboard/:id/copy"),
   },
 
   objectActions: {
@@ -59,6 +63,13 @@ const Dashboards = createEntity({
         return { type: UNFAVORITE_ACTION, payload: id };
       }
     },
+    
+    copy: ({ id }, overrides, opts) => 
+      Dashboards.actions.copy(
+        { id },
+        overrides,
+        opts,
+      ),
   },
 
   actions: {
@@ -70,6 +81,16 @@ const Dashboards = createEntity({
         payload: savedDashboard,
       };
     },
+
+    copy: (dashboard, overrides) => async dispatch => {
+      // overrides are name, description, and collection_id
+      const newDashboard = await Dashboards.api.copy(
+        { id: dashboard.id,
+          ...overrides
+        });
+      dispatch({ type: Dashboards.actionTypes.INVALIDATE_LISTS_ACTION });
+      return { type: COPY_ACTION, payload: newDashboard };
+    },
   },
 
   reducer: (state = {}, { type, payload, error }) => {
@@ -77,6 +98,8 @@ const Dashboards = createEntity({
       return assocIn(state, [payload, "favorite"], true);
     } else if (type === UNFAVORITE_ACTION && !error) {
       return assocIn(state, [payload, "favorite"], false);
+    } else if (type === COPY_ACTION && !error) {
+      return { ...state, "": state[""].concat([payload.result]) };
     }
     return state;
   },

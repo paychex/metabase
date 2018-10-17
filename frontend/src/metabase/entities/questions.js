@@ -15,6 +15,7 @@ import { POST, DELETE } from "metabase/lib/api";
 
 const FAVORITE_ACTION = `metabase/entities/questions/FAVORITE`;
 const UNFAVORITE_ACTION = `metabase/entities/questions/UNFAVORITE`;
+const COPY_ACTION = `metabase/entities/dashboards/COPY`;
 
 const Questions = createEntity({
   name: "questions",
@@ -23,6 +24,7 @@ const Questions = createEntity({
   api: {
     favorite: POST("/api/card/:id/favorite"),
     unfavorite: DELETE("/api/card/:id/favorite"),
+    copy: POST("/api/card/:id/copy"),
   },
 
   objectActions: {
@@ -59,6 +61,25 @@ const Questions = createEntity({
         return { type: UNFAVORITE_ACTION, payload: id };
       }
     },
+
+    copy: ({ id }, overrides, opts) => 
+      Questions.actions.copy(
+        { id },
+        overrides,
+        opts,
+      ),
+  },
+
+  actions: {
+    copy: (question, overrides) => async dispatch => {
+      // overrides are name, description, and collection_id
+      const newQuestion = await Questions.api.copy(
+        { id: question.id,
+          ...overrides
+        });
+      dispatch({ type: Questions.actionTypes.INVALIDATE_LISTS_ACTION });
+      return { type: COPY_ACTION, payload: newQuestion };
+    },
   },
 
   objectSelectors: {
@@ -75,6 +96,8 @@ const Questions = createEntity({
       return assocIn(state, [payload, "favorite"], true);
     } else if (type === UNFAVORITE_ACTION && !error) {
       return assocIn(state, [payload, "favorite"], false);
+    } else if (type === COPY_ACTION && !error) {
+      return { ...state, "": state[""].concat([payload.result]) };
     }
     return state;
   },
