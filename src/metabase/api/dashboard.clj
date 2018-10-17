@@ -221,10 +221,10 @@
                            ;; position, check that and fix up if needed
                            (api/maybe-reconcile-collection-position! dashboard-data)
                            ;; Ok, now save the Dashboard
-                           (db/insert! Dashboard dashboard-data))]
-      ;; Get cards from existing dashboard and associate to copied dashboard
-      (doseq [card (existing-dashboard :ordered_cards)]
-        (u/prog1 (api/check-500 (dashboard/add-dashcard! dashboard (card :card_id) card))))
+                           (u/prog1 (db/insert! Dashboard dashboard-data)
+                                    ;; Get cards from existing dashboard and associate to copied dashboard
+                                    (doseq [card (existing-dashboard :ordered_cards)]
+                                      (u/prog1 (api/check-500 (dashboard/add-dashcard! <> (card :card_id) card))))))]
       (events/publish-event! :dashboard-create (assoc dashboard :actor_id api/*current-user-id*)))))
 
 
