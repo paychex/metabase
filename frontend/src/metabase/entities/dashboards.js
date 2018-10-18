@@ -1,8 +1,10 @@
 /* @flow */
 
+import { createThunkAction } from "metabase/lib/redux";
 import { setRequestState } from "metabase/redux/requests";
+import { normalize } from "normalizr";
 
-import { createEntity, undo } from "metabase/lib/entities";
+import { createEntity, undo, notify } from "metabase/lib/entities";
 import * as Urls from "metabase/lib/urls";
 import { normal } from "metabase/lib/colors";
 import { assocIn } from "icepick";
@@ -64,7 +66,7 @@ const Dashboards = createEntity({
       }
     },
     
-    copy: ({ id }, overrides, opts) => 
+    copy: ({ id }, overrides, opts) =>
       Dashboards.actions.copy(
         { id },
         overrides,
@@ -82,15 +84,26 @@ const Dashboards = createEntity({
       };
     },
 
-    copy: (dashboard, overrides) => async dispatch => {
-      // overrides are name, description, and collection_id
-      const newDashboard = await Dashboards.api.copy(
-        { id: dashboard.id,
-          ...overrides
-        });
-      dispatch({ type: Dashboards.actionTypes.INVALIDATE_LISTS_ACTION });
-      return { type: COPY_ACTION, payload: newDashboard };
-    },
+    copy: createThunkAction(
+      COPY_ACTION,
+      (entityObject, overrides) => async (dispatch, getState) => {
+        const statePath = ["entities", entityObject.name, entityObject.id, "copy"];
+        try {
+          dispatch(setRequestState({ statePath, state: "LOADING" }));
+          const result = normalize(
+            await Dashboards.api.copy({ id: entityObject.id, ...overrides}),
+            Dashboards.schema,
+          );
+          dispatch(setRequestState({ statePath, state: "LOADED" }));
+          dispatch({ type: Dashboards.actionTypes.INVALIDATE_LISTS_ACTION });
+          return result;
+        } catch (error) {
+          console.error(`${COPY_ACTION} failed:`, error);
+          dispatch(setRequestState({ statePath, error }));
+          throw error;
+        }
+      },
+    ),
   },
 
   reducer: (state = {}, { type, payload, error }) => {
@@ -98,7 +111,7 @@ const Dashboards = createEntity({
       return assocIn(state, [payload, "favorite"], true);
     } else if (type === UNFAVORITE_ACTION && !error) {
       return assocIn(state, [payload, "favorite"], false);
-    } else if (type === COPY_ACTION && !error) {
+    } else if (type === COPY_ACTION && !error && state[""]) {
       return { ...state, "": state[""].concat([payload.result]) };
     }
     return state;

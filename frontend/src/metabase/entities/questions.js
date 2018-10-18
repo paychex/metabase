@@ -1,5 +1,9 @@
 /* @flow */
 
+import { createThunkAction } from "metabase/lib/redux";
+import { setRequestState } from "metabase/redux/requests";
+import { normalize } from "normalizr";
+
 import { assocIn } from "icepick";
 
 import { createEntity, undo } from "metabase/lib/entities";
@@ -71,15 +75,26 @@ const Questions = createEntity({
   },
 
   actions: {
-    copy: (question, overrides) => async dispatch => {
-      // overrides are name, description, and collection_id
-      const newQuestion = await Questions.api.copy(
-        { id: question.id,
-          ...overrides
-        });
-      dispatch({ type: Questions.actionTypes.INVALIDATE_LISTS_ACTION });
-      return { type: COPY_ACTION, payload: newQuestion };
-    },
+    copy: createThunkAction(
+      COPY_ACTION,
+      (entityObject, overrides) => async (dispatch, getState) => {
+        const statePath = ["entities", entityObject.name, entityObject.id, "copy"];
+        try {
+          dispatch(setRequestState({ statePath, state: "LOADING" }));
+          const result = normalize(
+            await Questions.api.copy({ id: entityObject.id, ...overrides}),
+            Questions.schema,
+          );
+          dispatch(setRequestState({ statePath, state: "LOADED" }));
+          dispatch({ type: Questions.actionTypes.INVALIDATE_LISTS_ACTION });
+          return result;
+        } catch (error) {
+          console.error(`${COPY_ACTION} failed:`, error);
+          dispatch(setRequestState({ statePath, error }));
+          throw error;
+        }
+      },
+    ),
   },
 
   objectSelectors: {
@@ -96,7 +111,7 @@ const Questions = createEntity({
       return assocIn(state, [payload, "favorite"], true);
     } else if (type === UNFAVORITE_ACTION && !error) {
       return assocIn(state, [payload, "favorite"], false);
-    } else if (type === COPY_ACTION && !error) {
+    } else if (type === COPY_ACTION && !error && state[""]) {
       return { ...state, "": state[""].concat([payload.result]) };
     }
     return state;

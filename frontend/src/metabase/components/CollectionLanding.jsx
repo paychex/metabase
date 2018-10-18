@@ -160,7 +160,7 @@ class DefaultLanding extends React.Component {
   handleBulkCopy = async collection => {
     try {
       await Promise.all(
-        this.state.selectedItems.map(item => item.copy(item, {name: item.name + " - " + t`Copy`, collection_id: collection.id})),
+        this.state.selectedItems.map(item => { item.copy({name: item.name + " - " + t`Copy`, collection_id: collection.id}) }),
       );
       this.setState({ selectedItems: null, isCopy: null });
     } finally {

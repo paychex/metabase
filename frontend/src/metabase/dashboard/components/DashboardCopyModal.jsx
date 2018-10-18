@@ -1,9 +1,10 @@
 import React from "react";
 import { withRouter } from "react-router";
 import { connect } from "react-redux";
-import { dissocIn } from "icepick";
+import { dissoc } from "icepick";
 import { t } from "c-3po";
 
+import { push } from "react-router-redux";
 import * as Urls from "metabase/lib/urls";
 
 import Dashboards from "metabase/entities/dashboards";
@@ -14,10 +15,6 @@ import ModalContent from "metabase/components/ModalContent";
 import { getDashboardComplete } from "../selectors";
 
 const mapStateToProps = (state, props) => {
-  console.log("MAP STATE TO PROPS")
-  console.log(state)
-  console.log(props)
-  console.log(getDashboardComplete(state, props))
   return {
     dashboard: getDashboardComplete(state, props),
   };
@@ -25,16 +22,14 @@ const mapStateToProps = (state, props) => {
 
 const mapDispatchToProps = {
     copy: Dashboards.actions.copy,
+    onChangeLocation: push,
 };
 
 @withRouter
 @connect(mapStateToProps, mapDispatchToProps)
 class DashboardCopyModal extends React.Component {
   render() {
-    const { onClose, copy, dashboard, ...props } = this.props;
-    console.log("HERE ARE MY PROPS");
-    console.log(this.props);
-    console.log(this.state);
+    const { onClose, onChangeLocation, copy, dashboard, ...props } = this.props;
     return (
       <ModalContent
         title={t`Copy ` + "\"" + dashboard.name + "\""}
@@ -43,22 +38,17 @@ class DashboardCopyModal extends React.Component {
         <EntityForm
           entityType="dashboards"
           entityObject={{
-            ...dashboard,
+            ...dissoc(dashboard, "id"),
             name: dashboard.name + " - " + t`Copy`
           }}
-          update={async values => {
-            await copy(
+          create={async values => {
+            return await copy(
               { id: this.props.params.dashboardId },
-              dissocIn(values, "id")
+              dissoc(values, "id"),
             )
           }}
           onClose={onClose}
-          onSaved={dashboard => {
-            //onChangeLocation(Urls.dashboard(dashboard.id));
-            if (onClose) {
-              onClose();
-            }
-          }}
+          onSaved={dashboard => onChangeLocation(Urls.dashboard(dashboard.id)) }
           submitTitle={t`Copy`}
           {...props}
         />
