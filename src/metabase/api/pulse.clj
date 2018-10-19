@@ -114,31 +114,6 @@
     (events/publish-event! :pulse-delete (assoc pulse :actor_id api/*current-user-id*)))
   api/generic-204-no-content)
 
-(api/defendpoint POST "/:id/copy"
-  "Copy `Pulse` with ID."
-  [id :as {{:keys [name collection_id collection_position]} :body}]
-  {name                su/NonBlankString
-   collection_id       (s/maybe su/IntGreaterThanZero)
-   collection_position (s/maybe su/IntGreaterThanZero)}
-  (let [existing-pulse (-> (api/read-check (pulse/retrieve-pulse id))
-                           (hydrate :can_write))
-        pulse-data {:name                name
-                    :creator_id          api/*current-user-id*
-                    :skip_if_empty       (:skip_if_empty existing-pulse)
-                    :collection_id       (or collection_id (:collection_id existing-pulse))
-                    :collection_position (or collection_position (:collection_position existing-pulse))}]
-    ;; make sure we are allowed to *read* all the Cards we want to put in this Pulse
-    (check-card-read-permissions (:cards existing-pulse))
-    ;; if we're trying to create this Pulse inside a Collection, make sure we have write permissions for that collection
-    (collection/check-write-perms-for-collection collection_id)
-    (db/transaction
-      ;; Adding a new pulse at `collection_position` could cause other pulses in this collection to change position,
-      ;; check that and fix it if needed
-      (api/maybe-reconcile-collection-position! pulse-data)
-      ;; ok, now create the Pulse
-      (api/check-500
-       (pulse/copy-pulse! existing-pulse pulse-data)))))
-
 (api/defendpoint GET "/form_input"
   "Provides relevant configuration information and user choices for creating/updating Pulses."
   []

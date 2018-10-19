@@ -1,9 +1,5 @@
 /* @flow */
 
-import { createThunkAction } from "metabase/lib/redux";
-import { setRequestState } from "metabase/redux/requests";
-import { normalize } from "normalizr";
-
 import { assocIn } from "icepick";
 
 import { createEntity, undo } from "metabase/lib/entities";
@@ -19,7 +15,6 @@ import { POST, DELETE } from "metabase/lib/api";
 
 const FAVORITE_ACTION = `metabase/entities/questions/FAVORITE`;
 const UNFAVORITE_ACTION = `metabase/entities/questions/UNFAVORITE`;
-const COPY_ACTION = `metabase/entities/dashboards/COPY`;
 
 const Questions = createEntity({
   name: "questions",
@@ -28,7 +23,6 @@ const Questions = createEntity({
   api: {
     favorite: POST("/api/card/:id/favorite"),
     unfavorite: DELETE("/api/card/:id/favorite"),
-    copy: POST("/api/card/:id/copy"),
   },
 
   objectActions: {
@@ -65,36 +59,6 @@ const Questions = createEntity({
         return { type: UNFAVORITE_ACTION, payload: id };
       }
     },
-
-    copy: ({ id }, overrides, opts) => 
-      Questions.actions.copy(
-        { id },
-        overrides,
-        opts,
-      ),
-  },
-
-  actions: {
-    copy: createThunkAction(
-      COPY_ACTION,
-      (entityObject, overrides) => async (dispatch, getState) => {
-        const statePath = ["entities", entityObject.name, entityObject.id, "copy"];
-        try {
-          dispatch(setRequestState({ statePath, state: "LOADING" }));
-          const result = normalize(
-            await Questions.api.copy({ id: entityObject.id, ...overrides}),
-            Questions.schema,
-          );
-          dispatch(setRequestState({ statePath, state: "LOADED" }));
-          dispatch({ type: Questions.actionTypes.INVALIDATE_LISTS_ACTION });
-          return result;
-        } catch (error) {
-          console.error(`${COPY_ACTION} failed:`, error);
-          dispatch(setRequestState({ statePath, error }));
-          throw error;
-        }
-      },
-    ),
   },
 
   objectSelectors: {
@@ -111,8 +75,6 @@ const Questions = createEntity({
       return assocIn(state, [payload, "favorite"], true);
     } else if (type === UNFAVORITE_ACTION && !error) {
       return assocIn(state, [payload, "favorite"], false);
-    } else if (type === COPY_ACTION && !error && state[""]) {
-      return { ...state, "": state[""].concat([payload.result]) };
     }
     return state;
   },

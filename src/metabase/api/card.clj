@@ -247,35 +247,6 @@
     (hydrate card :creator :dashboard_count :can_write :collection)))
 
 
-(api/defendpoint POST "/:from-card-id/copy"
-  "Copy a `Card`."
-  [from-card-id :as {{:keys [collection_id collection_position description name], :as body} :body}]
-  {name                   (s/maybe su/NonBlankString)
-   description            (s/maybe su/NonBlankString)
-   collection_id          (s/maybe su/IntGreaterThanZero)
-   collection_position    (s/maybe su/IntGreaterThanZero)}
-  ;; check that we have permissions for the collection we're trying to save this card to, if applicable
-  (collection/check-write-perms-for-collection collection_id)
-  (let [existing-card (Card from-card-id)]
-    (let [card-data {:creator_id             api/*current-user-id*
-                     :dataset_query          (existing-card :dataset_query)
-                     :description            (or description (existing-card :description))
-                     :display                (existing-card :display)
-                     :name                   (or name (str (existing-card :name) " - Copy"))
-                     :visualization_settings (existing-card :visualization_settings)
-                     :collection_id          collection_id
-                     :collection_position    collection_position}]
-      ;; check that we have permissions to run the query that we're trying to save
-      (api/check-403 (perms/set-has-full-permissions-for-set? @api/*current-user-permissions-set*
-                                                              (query-perms/perms-set (existing-card :dataset_query))))
-      ;; everything is g2g, now save the card
-      (db/transaction
-        ;; Adding a new card at `collection_position` could cause other cards in this
-        ;; collection to change position, check that and fix it if needed
-        (api/maybe-reconcile-collection-position! card-data)
-        (db/insert! Card card-data)))))
-
-
 ;;; ------------------------------------------------- Updating Cards -------------------------------------------------
 
 (defn check-data-permissions-for-query
