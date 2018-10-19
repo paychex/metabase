@@ -2,7 +2,7 @@ import React from "react";
 import { withRouter } from "react-router";
 import { connect } from "react-redux";
 import { dissoc } from "icepick";
-import { t } from "c-3po";
+import { t, jt } from "c-3po";
 
 import { push } from "react-router-redux";
 import * as Urls from "metabase/lib/urls";
@@ -21,7 +21,7 @@ const mapStateToProps = (state, props) => {
 };
 
 const mapDispatchToProps = {
-    copy: Dashboards.actions.copy,
+    copyDashboard: Dashboards.actions.copy,
     onChangeLocation: push,
 };
 
@@ -29,26 +29,26 @@ const mapDispatchToProps = {
 @connect(mapStateToProps, mapDispatchToProps)
 class DashboardCopyModal extends React.Component {
   render() {
-    const { onClose, onChangeLocation, copy, dashboard, ...props } = this.props;
+    const { onClose, onChangeLocation, copyDashboard, dashboard, ...props } = this.props;
     return (
       <ModalContent
-        title={t`Copy ` + "\"" + dashboard.name + "\""}
+        title={jt`Copy "${(dashboard && dashboard.name) || t`item`}"`}
         onClose={onClose}
       >
         <EntityForm
-          entityType="dashboards"
+          entityType={"dashboards"}
           entityObject={{
             ...dissoc(dashboard, "id"),
-            name: dashboard.name + " - " + t`Copy`
+            name: dashboard && (dashboard.name + " - " + t`Copy`)
           }}
           create={async values => {
-            return await copy(
-              { id: this.props.params.dashboardId },
+            return await copyDashboard(
+              { id: dashboard.id },
               dissoc(values, "id"),
             )
           }}
           onClose={onClose}
-          onSaved={dashboard => onChangeLocation(Urls.dashboard(dashboard.id)) }
+          onSaved={dashboard => onChangeLocation(Urls.dashboard(dashboard.id))}
           submitTitle={t`Copy`}
           {...props}
         />
